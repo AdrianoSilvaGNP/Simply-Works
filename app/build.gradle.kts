@@ -2,8 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    //kotlinx-serialization
-    kotlin("plugin.serialization") version "2.2.21"
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -57,11 +56,17 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    implementation("io.ktor:ktor-client-core:3.3.3")
-    implementation("io.ktor:ktor-client-cio:3.3.3")
+    implementation(libs.timber)
+
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.3")
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+
+
+    implementation("androidx.navigation:navigation-compose:2.9.6")
+
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
