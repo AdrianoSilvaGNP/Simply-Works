@@ -6,8 +6,11 @@ import com.adrianosilva.simply_works.Utils.decrypt
 import com.adrianosilva.simply_works.Utils.encrypt
 import com.adrianosilva.simply_works.Utils.hexToBytes
 import com.adrianosilva.simply_works.data.dto.MachineStatusResponse
+import com.adrianosilva.simply_works.data.dto.MachineUsageStatsResponse
+import com.adrianosilva.simply_works.data.dto.StatusCounters
 import com.adrianosilva.simply_works.data.dto.WashProgramRequest
 import com.adrianosilva.simply_works.domain.models.MachineState
+import com.adrianosilva.simply_works.domain.models.WashProgram
 import com.adrianosilva.simply_works.domain.models.WashProgramPhase
 import com.adrianosilva.simply_works.domain.models.WashingMachineStatus
 import io.ktor.client.HttpClient
@@ -103,7 +106,7 @@ class CandyApiService(
         WashingMachineStatus(
             machineState = MachineState.fromCode(response.statusLavatrice.machineMode.toInt()),
             programState = WashProgramPhase.fromCode(response.statusLavatrice.programPhase.toInt()),
-            program = response.statusLavatrice.programNumber.toInt(),
+            program = WashProgram.allPrograms.first { it.number == response.statusLavatrice.programNumber.toInt() },
             temp = response.statusLavatrice.temp.toInt(),
             spinSpeed = response.statusLavatrice.spinSpeed.toInt() * 100,
             remainingMinutes = response.statusLavatrice.remainingTime.toInt(),
@@ -155,7 +158,7 @@ class CandyApiService(
         Timber.d("Reset command response (decrypted): ${decrypted.decodeToString()}")
     }
 
-    suspend fun getUsageStats(): String = withContext(Dispatchers.Default) {
+    suspend fun getUsageStats(): StatusCounters = withContext(Dispatchers.Default) {
 
         val requestArray = WashProgramRequest(
             getStats = 1
@@ -172,9 +175,9 @@ class CandyApiService(
         val jsonString = decrypted.decodeToString()
         Timber.d("Usage stats command response (decrypted): $jsonString")
 
-        //val test = json.decodeFromString(MachineUsageStatsResponse.serializer(), jsonString)
+        val usageStatsResponse = json.decodeFromString(MachineUsageStatsResponse.serializer(), jsonString)
 
-        jsonString
+        usageStatsResponse.statusCounters
     }
 
     companion object {

@@ -6,6 +6,13 @@ sealed class WashProgram(
     val name: String,
     val description: String
 ) {
+    data object Standby: WashProgram(
+        code = 65,
+        number = 2,
+        name = "Standby",
+        description = "",
+    )
+
     data object Eco4060: WashProgram(
         code = 2,
         number = 3,
@@ -99,6 +106,7 @@ sealed class WashProgram(
 
     companion object {
         val allPrograms: List<WashProgram> = listOf(
+            Standby,
             Eco4060,
             Jeans,
             HandWashAndWool,

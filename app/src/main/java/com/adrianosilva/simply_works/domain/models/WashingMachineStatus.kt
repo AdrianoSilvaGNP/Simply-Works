@@ -6,7 +6,7 @@ package com.adrianosilva.simply_works.domain.models
 data class WashingMachineStatus(
     val machineState: MachineState,
     val programState: WashProgramPhase,
-    val program: Int,
+    val program: WashProgram,
     val temp: Int,
     val spinSpeed: Int,
     val remainingMinutes: Int,

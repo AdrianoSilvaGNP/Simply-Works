@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.adrianosilva.simply_works.domain.models.MachineState
+import com.adrianosilva.simply_works.domain.models.WashProgram
 import com.adrianosilva.simply_works.domain.models.WashProgramPhase
 import com.adrianosilva.simply_works.domain.models.WashingMachineStatus
 import com.adrianosilva.simply_works.ui.theme.SimplyworksTheme
@@ -25,15 +26,16 @@ import com.adrianosilva.simply_works.ui.theme.SimplyworksTheme
 @Composable
 fun MachineStatusScreenRoot(
     viewModel: MachineStatusViewModel,
-    onGoToWashProgram: () -> Unit
+    onGoToWashProgram: () -> Unit,
+    onGoToUsageStats: () -> Unit
 ) {
     MachineStatusScreen(
         state = viewModel.state,
         onAction = {
-            if (it is MachineStatusAction.GoToWashProgram) {
-                onGoToWashProgram()
-            } else {
-                viewModel.onAction(it)
+            when (it) {
+                is MachineStatusAction.GoToUsageStats -> onGoToUsageStats()
+                is MachineStatusAction.GoToWashProgram -> onGoToWashProgram()
+                else -> viewModel.onAction(it)
             }
         }
     )
@@ -88,14 +90,17 @@ fun MachineStatusScreen(state: MachineStatusUiState, onAction: (MachineStatusAct
         Text("Washing Machine Status", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(20.dp))
 
-        Text("State: ${status.machineState}")
-        Text("Program: ${status.program}")
-        Text("Program State: ${status.programState}")
-        Text("Temperature: ${status.temp} ºC")
-        Text("Spin Speed: ${status.spinSpeed} rpm")
-        Text("Remaining Time: ${status.remainingMinutes} min")
-        status.delayMinutes?.let {
-            Text("Delay Start: $it min")
+        Text("Program: ${status.program.name}")
+
+        if (status.program.name != "Standby") {
+            Text("State: ${status.machineState}")
+            Text("Program State: ${status.programState}")
+            Text("Temperature: ${status.temp} ºC")
+            Text("Spin Speed: ${status.spinSpeed} rpm")
+            Text("Remaining Time: ${status.remainingMinutes} min")
+            status.delayMinutes?.let {
+                Text("Delay Start: $it min")
+            }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -105,12 +110,6 @@ fun MachineStatusScreen(state: MachineStatusUiState, onAction: (MachineStatusAct
             onClick = { onAction(MachineStatusAction.Refresh) }) {
             Text("Refresh")
         }
-
-        /*Button(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = { onAction(MachineStatusAction.CallTestCycleIn30Min) }) {
-            Text("Eco 30ºC 800 RPM in 30 min")
-        }*/
 
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -126,8 +125,8 @@ fun MachineStatusScreen(state: MachineStatusUiState, onAction: (MachineStatusAct
 
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = { onAction(MachineStatusAction.GetUsageStats) }) {
-            Text("Get Usage Stats")
+            onClick = { onAction(MachineStatusAction.GoToUsageStats) }) {
+            Text("Go To Usage Stats")
         }
     }
 }
@@ -143,7 +142,7 @@ private fun MachineStatusScreenPreview() {
                 status = WashingMachineStatus(
                     machineState = MachineState.RUNNING,
                     programState = WashProgramPhase.WASH,
-                    program = 3,
+                    program = WashProgram.Eco4060,
                     temp = 40,
                     spinSpeed = 800,
                     remainingMinutes = 55
