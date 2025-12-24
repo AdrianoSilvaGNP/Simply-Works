@@ -9,6 +9,6 @@ data class WashingMachineStatus(
     val program: WashProgram,
     val temp: Int,
     val spinSpeed: Int,
-    val remainingMinutes: Int,
+    val remainingTime: String,
     val delayMinutes: Int? = null
 )

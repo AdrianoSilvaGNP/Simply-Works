@@ -3,6 +3,7 @@ package com.adrianosilva.simply_works.data.remote
 
 import com.adrianosilva.simply_works.Utils.bytesToHex
 import com.adrianosilva.simply_works.Utils.decrypt
+import com.adrianosilva.simply_works.Utils.deriveKey
 import com.adrianosilva.simply_works.Utils.encrypt
 import com.adrianosilva.simply_works.Utils.hexToBytes
 import com.adrianosilva.simply_works.data.dto.MachineStatusResponse
@@ -22,7 +23,9 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -37,6 +40,7 @@ class CandyApiService(
     private val baseUrl: String,
     private var xorKey: ByteArray
 ) {
+
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(json)
@@ -44,6 +48,20 @@ class CandyApiService(
         install(HttpTimeout) {
             requestTimeoutMillis = 4000
             connectTimeoutMillis = 4000
+        }
+    }
+
+    fun deriveKey() {
+        if (xorKey.isEmpty()) {
+            CoroutineScope(Dispatchers.Default).launch {
+                val encrypted = readData()
+                Timber.d("encrypted data: $encrypted")
+
+                val encryptedBytes = hexToBytes(encrypted)
+                val derivedKey = deriveKey(encryptedBytes)
+                xorKey = derivedKey
+                Timber.d("Derived XOR key: ${xorKey.toString(Charsets.UTF_8)}")
+            }
         }
     }
 
@@ -103,13 +121,22 @@ class CandyApiService(
 
         val response = json.decodeFromString(MachineStatusResponse.serializer(), jsonString)
 
+        val remainingTimeMinutes = response.statusLavatrice.remainingTime.toInt() / 60
+        val hours = remainingTimeMinutes / 60
+        val minutes = remainingTimeMinutes % 60
+
+        val formattedTime = when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            else -> "$minutes min"
+        }
+
         WashingMachineStatus(
             machineState = MachineState.fromCode(response.statusLavatrice.machineMode.toInt()),
             programState = WashProgramPhase.fromCode(response.statusLavatrice.programPhase.toInt()),
             program = WashProgram.allPrograms.first { it.number == response.statusLavatrice.programNumber.toInt() },
             temp = response.statusLavatrice.temp.toInt(),
             spinSpeed = response.statusLavatrice.spinSpeed.toInt() * 100,
-            remainingMinutes = response.statusLavatrice.remainingTime.toInt(),
+            remainingTime = formattedTime,
             delayMinutes = response.statusLavatrice.delayValue.toInt()
         )
     }

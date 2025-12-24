@@ -44,6 +44,7 @@ fun MachineStatusScreenRoot(
 @Composable
 fun MachineStatusScreen(state: MachineStatusUiState, onAction: (MachineStatusAction) -> Unit) {
 
+    // Refresh data when screen is created
     LaunchedEffect(Unit) {
         onAction(MachineStatusAction.Refresh)
     }
@@ -97,7 +98,7 @@ fun MachineStatusScreen(state: MachineStatusUiState, onAction: (MachineStatusAct
             Text("Program State: ${status.programState}")
             Text("Temperature: ${status.temp} ºC")
             Text("Spin Speed: ${status.spinSpeed} rpm")
-            Text("Remaining Time: ${status.remainingMinutes} min")
+            Text("Remaining Time: ${status.remainingTime}")
             status.delayMinutes?.let {
                 Text("Delay Start: $it min")
             }
@@ -145,7 +146,7 @@ private fun MachineStatusScreenPreview() {
                     program = WashProgram.Eco4060,
                     temp = 40,
                     spinSpeed = 800,
-                    remainingMinutes = 55
+                    remainingTime = "55 min"
                 )
             ),
             onAction = {}
