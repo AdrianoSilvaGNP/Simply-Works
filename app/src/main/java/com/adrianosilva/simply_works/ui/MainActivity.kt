@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.adrianosilva.simply_works.data.local.KeyManager
 import com.adrianosilva.simply_works.data.remote.CandyApiService
 import com.adrianosilva.simply_works.ui.machinestatus.MachineStatusScreenRoot
 import com.adrianosilva.simply_works.ui.machinestatus.MachineStatusViewModel
@@ -26,13 +27,15 @@ class MainActivity: ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val xorKey = "".toByteArray() // put here your XOR key if you have it already
-        val candyApiService = CandyApiService(
-            baseUrl = "http://192.168.1.185",
-            xorKey = xorKey
-        )
+        val keyManager = KeyManager(applicationContext)
+        val savedKey = keyManager.getKey()
+        val xorKey = savedKey ?: "".toByteArray()
+        val candyApiService = CandyApiService(baseUrl = "http://192.168.1.185", xorKey = xorKey) // TODO: Make machine IP configurable
+
         if (xorKey.isEmpty()) {
-            candyApiService.deriveKey()
+            candyApiService.deriveKey { derived ->
+                keyManager.saveKey(derived)
+            }
         }
         setContent {
             SimplyworksTheme {
@@ -47,9 +50,7 @@ class MainActivity: ComponentActivity() {
                         composable(Screen.MachineStatus.route) {
                             MachineStatusScreenRoot(
                                 viewModel = viewModel(
-                                    factory = MachineStatusViewModel.Companion.MachineStatusViewModelFactory(
-                                        candyApiService
-                                    )
+                                    factory = MachineStatusViewModel.Companion.MachineStatusViewModelFactory(candyApiService)
                                 ),
                                 onGoToWashProgram = {
                                     navController.navigate(Screen.WashProgram.route)
@@ -65,19 +66,19 @@ class MainActivity: ComponentActivity() {
                         composable(Screen.WashProgram.route) {
                             WashProgramScreenRoot(
                                 viewModel = viewModel(
-                                    factory = WashProgramViewModel.Companion.WashProgramViewModelFactory(
-                                        candyApiService
-                                    )
-                                )
+                                    factory = WashProgramViewModel.Companion.WashProgramViewModelFactory(candyApiService)
+                                ),
+                                onWashStarted = {
+                                    navController.popBackStack()
+                                    Timber.d("Wash started, navigating back")
+                                }
                             )
                         }
 
                         composable(Screen.UsageStats.route) {
                             UsageStatsScreenRoot(
                                 viewModel(
-                                    factory = UsageStatsViewModel.Companion.UsageStatsViewModelFactory(
-                                        candyApiService
-                                    )
+                                    factory = UsageStatsViewModel.Companion.UsageStatsViewModelFactory(candyApiService)
                                 )
                             )
                         }

@@ -9,3 +9,7 @@ sealed class WashProgramAction {
     data class SetDelayValue(val delayValue: Int): WashProgramAction()
     data object SendWashProgram: WashProgramAction()
 }
+
+sealed class WashProgramEvent {
+    data object NavigateBack: WashProgramEvent()
+}

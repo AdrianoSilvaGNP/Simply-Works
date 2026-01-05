@@ -57,14 +57,15 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation(libs.timber)
+    implementation(libs.androidx.security.crypto)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
 
-    implementation("androidx.navigation:navigation-compose:2.9.6")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation(libs.navigation.compose)
+    implementation(libs.viewmodel.compose)
 
 }

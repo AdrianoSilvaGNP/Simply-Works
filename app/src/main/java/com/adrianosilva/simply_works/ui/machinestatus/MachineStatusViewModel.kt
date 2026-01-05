@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.adrianosilva.simply_works.data.remote.CandyApiService
+import com.adrianosilva.simply_works.domain.ErrorReason
+import com.adrianosilva.simply_works.domain.Result
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -28,13 +30,20 @@ class MachineStatusViewModel(
     private fun loadStatus() {
         viewModelScope.launch {
             state = state.copy(isLoading = true, errorMessage = null)
-            try {
-                Timber.d("Fetching machine status...")
-                val status = api.getStatus()
-                state = state.copy(isLoading = false, status = status)
-            } catch (e: Exception) {
-                Timber.e(e, "Error fetching machine status")
-                state = state.copy(isLoading = false, errorMessage = e.message)
+
+            when (val result = api.getStatus()) {
+                is Result.Success -> {
+                    Timber.d("Fetching machine status success")
+                    state = state.copy(isLoading = false, status = result.data)
+                }
+
+                is Result.Error -> {
+                    Timber.e("Error fetching machine status: ${result.reason}")
+                    state = state.copy(
+                        isLoading = false,
+                        errorMessage = result.reason.toUiMessage()
+                    )
+                }
             }
         }
     }
@@ -42,21 +51,35 @@ class MachineStatusViewModel(
     private fun resetWashCycle() {
         viewModelScope.launch {
             state = state.copy(isLoading = true, errorMessage = null)
-            try {
-                api.callResetWashCycle()
-                Timber.d("Wash cycle reset successfully.")
-                loadStatus()
-            } catch (e: Exception) {
-                Timber.e(e, "Error resetting wash cycle")
-                state = state.copy(isLoading = false, errorMessage = e.message)
+
+            when (val result = api.callResetWashCycle()) {
+                is Result.Success -> {
+                    Timber.d("Wash cycle reset successfully.")
+                    loadStatus()
+                }
+
+                is Result.Error -> {
+                    Timber.e("Error resetting wash cycle: ${result.reason}")
+                    state = state.copy(
+                        isLoading = false,
+                        errorMessage = result.reason.toUiMessage()
+                    )
+                }
             }
         }
     }
 
+    private fun ErrorReason.toUiMessage(): String =
+        when (this) {
+            is ErrorReason.NoConnection -> "No connection to machine"
+            is ErrorReason.NoData -> "No data received"
+            is ErrorReason.NetworkError -> "Network error: Are you connected to the machine's home Wi-Fi? Or is the machine turned on?\n\nDetails: $message"
+            is ErrorReason.Unknown -> "Unknown error: ${exception.localizedMessage}"
+        }
+
     companion object {
-        class MachineStatusViewModelFactory(
-            private val candyApiService: CandyApiService
-        ): ViewModelProvider.Factory {
+        class MachineStatusViewModelFactory(private val candyApiService: CandyApiService):
+            ViewModelProvider.Factory {
 
             @Suppress("UNCHECKED_CAST")
             override fun <T: ViewModel> create(modelClass: Class<T>): T {

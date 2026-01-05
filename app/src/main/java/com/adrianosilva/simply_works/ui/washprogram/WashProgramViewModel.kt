@@ -8,14 +8,19 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.adrianosilva.simply_works.data.dto.WashProgramRequest
 import com.adrianosilva.simply_works.data.remote.CandyApiService
+import com.adrianosilva.simply_works.domain.ErrorReason
+import com.adrianosilva.simply_works.domain.Result
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-class WashProgramViewModel(
-    private val api: CandyApiService
-): ViewModel() {
+class WashProgramViewModel(private val api: CandyApiService): ViewModel() {
 
     var state by mutableStateOf(WashProgramUiState())
         private set
+
+    private val _event = Channel<WashProgramEvent>()
+    val event = _event.receiveAsFlow()
 
     fun onAction(action: WashProgramAction) {
         when (action) {
@@ -44,8 +49,8 @@ class WashProgramViewModel(
     private fun sendWashProgram() {
         viewModelScope.launch {
             state = state.copy(isSendingRequest = true, errorMessage = null)
-            try {
-                val request = WashProgramRequest(
+            val request =
+                WashProgramRequest(
                     startStop = 1,
                     programNumber = state.selectedProgram.number,
                     programCode = state.selectedProgram.code,
@@ -54,20 +59,32 @@ class WashProgramViewModel(
                     delayValue = state.delayValue
                 )
 
-                api.sendWashRequest(request)
-                state = state.copy(isSendingRequest = false)
-            } catch (e: Exception) {
-                state = state.copy(isSendingRequest = false, errorMessage = e.message)
+            when (val result = api.sendWashRequest(request)) {
+                is Result.Success -> {
+                    state = state.copy(isSendingRequest = false)
+                    _event.send(WashProgramEvent.NavigateBack)
+                }
+
+                is Result.Error -> {
+                    val message = when (val reason = result.reason) {
+                        is ErrorReason.NoConnection -> "No connection"
+                        is ErrorReason.NoData -> "No data"
+                        is ErrorReason.NetworkError -> "Network error: ${reason.message}"
+                        is ErrorReason.Unknown ->
+                            "Unknown error: ${reason.exception.localizedMessage}"
+                    }
+                    state = state.copy(isSendingRequest = false, errorMessage = message)
+                }
             }
         }
     }
 
     companion object {
-        class WashProgramViewModelFactory(private val apiService: CandyApiService): ViewModelProvider.Factory {
+        class WashProgramViewModelFactory(private val apiService: CandyApiService):
+            ViewModelProvider.Factory {
             override fun <T: ViewModel> create(modelClass: Class<T>): T {
                 if (modelClass.isAssignableFrom(WashProgramViewModel::class.java)) {
-                    @Suppress("UNCHECKED_CAST")
-                    return WashProgramViewModel(apiService) as T
+                    @Suppress("UNCHECKED_CAST") return WashProgramViewModel(apiService) as T
                 }
                 throw IllegalArgumentException("Unknown ViewModel class")
             }
