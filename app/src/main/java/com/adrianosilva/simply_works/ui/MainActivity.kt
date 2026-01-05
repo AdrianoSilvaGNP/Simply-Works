@@ -30,7 +30,7 @@ class MainActivity: ComponentActivity() {
         val keyManager = KeyManager(applicationContext)
         val savedKey = keyManager.getKey()
         val xorKey = savedKey ?: "".toByteArray()
-        val candyApiService = CandyApiService(baseUrl = "http://192.168.1.185", xorKey = xorKey) // TODO: Make machine IP configurable
+        val candyApiService = CandyApiService(baseUrl = MACHINE_IP, xorKey = xorKey)
 
         if (xorKey.isEmpty()) {
             candyApiService.deriveKey { derived ->
@@ -86,5 +86,9 @@ class MainActivity: ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        const val MACHINE_IP = "http://192.168.1.185"
     }
 }
