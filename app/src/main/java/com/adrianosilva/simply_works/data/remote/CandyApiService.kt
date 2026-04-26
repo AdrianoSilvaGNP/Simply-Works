@@ -24,15 +24,15 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.json.json
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import timber.log.Timber
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
 
 /**
  * Service class for interacting with the Candy washing machine API.
@@ -43,13 +43,13 @@ import java.net.SocketTimeoutException
 class CandyApiService(private val baseUrl: String, private var xorKey: ByteArray) {
 
     private val client =
-        HttpClient(CIO) {
-            install(ContentNegotiation) { json(json) }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 3000
-                connectTimeoutMillis = 3000
+            HttpClient(CIO) {
+                install(ContentNegotiation) { json(json) }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 3000
+                    connectTimeoutMillis = 3000
+                }
             }
-        }
 
     fun deriveKey(onKeyDerived: ((ByteArray) -> Unit)? = null) {
         if (xorKey.isEmpty()) {
@@ -59,13 +59,16 @@ class CandyApiService(private val baseUrl: String, private var xorKey: ByteArray
                         val encrypted = result.data
                         Timber.d("encrypted data: $encrypted")
 
-                        val encryptedBytes = hexToBytes(encrypted)
-                        val derivedKey = deriveKey(encryptedBytes)
-                        xorKey = derivedKey
-                        Timber.d("Derived XOR key: ${xorKey.toString(Charsets.UTF_8)}")
-                        onKeyDerived?.invoke(derivedKey)
+                        try {
+                            val encryptedBytes = hexToBytes(encrypted)
+                            val derivedKey = deriveKey(encryptedBytes)
+                            xorKey = derivedKey
+                            Timber.d("Derived XOR key: ${xorKey.toString(Charsets.UTF_8)}")
+                            onKeyDerived?.invoke(derivedKey)
+                        } catch (e: Exception) {
+                            Timber.e("Failed to parse hex and derive key: ${e.localizedMessage}")
+                        }
                     }
-
                     is Result.Error -> {
                         Timber.e("Failed to derive key: ${result.reason}")
                     }
@@ -75,32 +78,36 @@ class CandyApiService(private val baseUrl: String, private var xorKey: ByteArray
     }
 
     suspend fun readData(): Result<String> =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = client.get("$baseUrl/http-read.json?encrypted=1") {
-                    accept(ContentType.Text.Html)
-                }.body<String>()
-
-                Result.Success(response)
-            } catch (e: Throwable) {
-                Timber.e("Error reading data from washing machine: ${e.localizedMessage}")
-                Result.Error(e.toErrorReason())
+            withContext(Dispatchers.IO) {
+                try {
+                    val response =
+                            client
+                                    .get("$baseUrl/http-read.json?encrypted=1") {
+                                        accept(ContentType.Text.Html)
+                                    }
+                                    .body<String>()
+                    Result.Success(response)
+                } catch (e: Throwable) {
+                    Timber.e("Error reading data from washing machine: ${e.localizedMessage}")
+                    Result.Error(e.toErrorReason())
+                }
             }
-        }
 
     suspend fun writeData(data: String): Result<String> =
-        withContext(Dispatchers.IO) {
-            try {
-                val response = client.get("$baseUrl/http-write.json?encrypted=1&data=$data") {
-                    accept(ContentType.Text.Html)
-                }.body<String>()
-
-                Result.Success(response)
-            } catch (e: Throwable) {
-                Timber.e("Error writing data to washing machine: ${e.localizedMessage}")
-                Result.Error(e.toErrorReason())
+            withContext(Dispatchers.IO) {
+                try {
+                    val response =
+                            client
+                                    .get("$baseUrl/http-write.json?encrypted=1&data=$data") {
+                                        accept(ContentType.Text.Html)
+                                    }
+                                    .body<String>()
+                    Result.Success(response)
+                } catch (e: Throwable) {
+                    Timber.e("Error writing data to washing machine: ${e.localizedMessage}")
+                    Result.Error(e.toErrorReason())
+                }
             }
-        }
 
     suspend fun sendWashRequest(request: WashProgramRequest): Result<Unit> {
         val requestArray = request.toQueryString().toByteArray()
@@ -115,133 +122,238 @@ class CandyApiService(private val baseUrl: String, private var xorKey: ByteArray
                 try {
                     val encryptedBytes = hexToBytes(result.data)
                     val decrypted = decrypt(xorKey, encryptedBytes)
-                    Timber.d("Wash program command response (decrypted): ${decrypted.decodeToString()}")
+                    Timber.d(
+                            "Wash program command response (decrypted): ${decrypted.decodeToString()}"
+                    )
                     Result.Success(Unit)
                 } catch (e: Exception) {
                     Result.Error(ErrorReason.Unknown(e))
                 }
             }
-
             is Result.Error -> Result.Error(result.reason)
         }
     }
 
-    suspend fun getStatus(): Result<WashingMachineStatus> = withContext(Dispatchers.Default) {
-        when (val result = readData()) {
-            is Result.Success -> {
+    // Run Eco 30C 800RPM in 30 minutes
+    suspend fun getTestRunEncrypted(): Result<String> =
+            withContext(Dispatchers.IO) {
                 try {
-                    val encrypted = result.data
-                    Timber.d("encrypted data: $encrypted")
-
-                    val encryptedBytes = hexToBytes(encrypted)
-                    val decrypted = decrypt(xorKey, encryptedBytes)
-                    val jsonString = decrypted.decodeToString()
-                    Timber.d("Decrypted data: $jsonString")
-
-                    if (jsonString.isEmpty()) {
-                        return@withContext Result.Error(ErrorReason.NoData)
-                    }
-
-                    val response = json.decodeFromString<MachineStatusResponse>(jsonString)
-
-                    val remainingTimeMinutes = response.statusLavatrice.remainingTime.toInt() / 60
-                    val hours = remainingTimeMinutes / 60
-                    val minutes = remainingTimeMinutes % 60
-
-                    val formattedTime = when {
-                        hours > 0 -> "${hours}h ${minutes}m"
-                        else -> "$minutes min"
-                    }
-
-                    Result.Success(
-                        WashingMachineStatus(
-                            machineState = MachineState.fromCode(response.statusLavatrice.machineMode.toInt()),
-                            programState = WashProgramPhase.fromCode(response.statusLavatrice.programPhase.toInt()),
-                            program = WashProgram.allPrograms.first {
-                                it.number == response.statusLavatrice.programNumber.toInt()
-                            },
-                            temp = response.statusLavatrice.temp.toInt(),
-                            spinSpeed = response.statusLavatrice.spinSpeed.toInt() * 100,
-                            remainingTime = formattedTime,
-                            delayMinutes = response.statusLavatrice.delayValue.toInt()
-                        )
-                    )
+                    val response =
+                            client
+                                    .get(
+                                            "$baseUrl/http-write.json?encrypted=1&data=321C071A085C5D413F1F341F5B5F4F2F0002380250534A371E250A565548391926010A0B50534A371E3813195B2B0A04455A5E435B514A33011B330C12535A5B433D220B1B350B13515B4138160A3D0C115356482211182A1F0056565648261B11231D055F5C5C41200A090C5B5A4F381103535E4B251E1E515B412E2253594D370B0D071D042503515B4138120F1B1F26060B0D06341C5A5C4D2302151E3D0E161A21005050"
+                                    ) { accept(ContentType.Application.Json) }
+                                    .body<String>()
+                    Result.Success(response)
                 } catch (e: Throwable) {
-                    Result.Error(ErrorReason.Unknown(e))
+                    Result.Error(e.toErrorReason())
                 }
             }
 
-            is Result.Error -> Result.Error(result.reason)
-        }
-    }
-
-    suspend fun callResetWashCycle(): Result<Unit> = withContext(Dispatchers.Default) {
-        val requestArray =
-            WashProgramRequest(
-                write = 1,
-                startStop = 0,
-                programNumber = 3,
-                delayValue = 0
-            ).toQueryString().toByteArray()
-
-        Timber.d("Reset command (plain): ${requestArray.decodeToString()}")
-
-        val encrypted = encrypt(xorKey, requestArray)
-        val stringMessage = bytesToHex(encrypted)
-        Timber.d("Reset command (encrypted): $stringMessage")
-
-        when (val result = writeData(stringMessage)) {
-            is Result.Success -> {
+    suspend fun getUsageStatsEncrypted(): Result<String> =
+            withContext(Dispatchers.IO) {
                 try {
-                    val encryptedBytes = hexToBytes(result.data)
-                    val decrypted = decrypt(xorKey, encryptedBytes)
-                    Timber.d(
-                        "Reset command response (decrypted): ${decrypted.decodeToString()}"
-                    )
-                    Result.Success(Unit)
+                    val response =
+                            client
+                                    .get(
+                                            "$baseUrl/http-write.json?encrypted=1&data=220B1A3D1900185A5D"
+                                    ) { // data is GetStat=1
+                                        accept(ContentType.Application.Json)
+                                    }
+                                    .body<String>()
+                    Result.Success(response)
                 } catch (e: Throwable) {
-                    Result.Error(ErrorReason.Unknown(e))
+                    Result.Error(e.toErrorReason())
                 }
             }
 
-            is Result.Error -> Result.Error(result.reason)
-        }
-    }
+    suspend fun callResetEncrypted(): Result<String> =
+            withContext(Dispatchers.IO) {
+                try {
+                    val response =
+                            client
+                                    .get(
+                                            "$baseUrl/http-write.json?encrypted=1&data=321C071A085C5D413F1F341F5B5E4F3B172003535E472802003D0B5656"
+                                    ) { // data is Write=1&StSt=0&PrNm=3&DelVl=0
+                                        accept(ContentType.Application.Json)
+                                    }
+                                    .body<String>()
+                    Result.Success(response)
+                } catch (e: Throwable) {
+                    Result.Error(e.toErrorReason())
+                }
+            }
 
-    suspend fun getUsageStats(): Result<StatusCounters> = withContext(Dispatchers.Default) {
-            val requestArray = WashProgramRequest(getStats = 1).toQueryString().toByteArray()
+    suspend fun getStatus(): Result<WashingMachineStatus> =
+            withContext(Dispatchers.Default) {
+                when (val result = readData()) {
+                    is Result.Success -> {
+                        try {
+                            val encrypted = result.data
+                            Timber.d("encrypted data: $encrypted")
 
-            Timber.d("Usage stats request: ${requestArray.decodeToString()}")
-            val encrypted = encrypt(xorKey, requestArray)
-            val stringMessage = bytesToHex(encrypted)
-            Timber.d("Usage stats command (encrypted): $stringMessage")
+                            val encryptedBytes = hexToBytes(encrypted)
+                            val decrypted = decrypt(xorKey, encryptedBytes)
+                            val jsonString = decrypted.decodeToString()
+                            Timber.d("Decrypted data: $jsonString")
 
-            when (val result = writeData(stringMessage)) {
-                is Result.Success -> {
-                    try {
-                        val encryptedBytes = hexToBytes(result.data)
-                        val decrypted = decrypt(xorKey, encryptedBytes)
-                        val jsonString = decrypted.decodeToString()
-                        Timber.d("Usage stats command response (decrypted): $jsonString")
+                            if (jsonString.isEmpty())
+                                    return@withContext Result.Error(ErrorReason.NoData)
 
-                        val usageStatsResponse =
-                            json.decodeFromString<MachineUsageStatsResponse>(jsonString)
+                            val response = json.decodeFromString<MachineStatusResponse>(jsonString)
 
-                        Result.Success(usageStatsResponse.statusCounters)
-                    } catch (e: Throwable) {
-                        Result.Error(ErrorReason.Unknown(e))
+                            val remainingTimeMinutes =
+                                    response.statusLavatrice.remainingTime.toInt() / 60
+                            val hours = remainingTimeMinutes / 60
+                            val minutes = remainingTimeMinutes % 60
+
+                            val formattedTime =
+                                    when {
+                                        hours > 0 -> "${hours}h ${minutes}m"
+                                        else -> "$minutes min"
+                                    }
+
+                            Result.Success(
+                                    WashingMachineStatus(
+                                            machineState =
+                                                    MachineState.fromCode(
+                                                            response.statusLavatrice.machineMode
+                                                                    .toInt()
+                                                    ),
+                                            programState =
+                                                    WashProgramPhase.fromCode(
+                                                            response.statusLavatrice.programPhase
+                                                                    .toInt()
+                                                    ),
+                                            program =
+                                                    WashProgram.allPrograms.first {
+                                                        it.number ==
+                                                                response.statusLavatrice
+                                                                        .programNumber.toInt()
+                                                    },
+                                            temp = response.statusLavatrice.temp.toInt(),
+                                            spinSpeed =
+                                                    response.statusLavatrice.spinSpeed.toInt() *
+                                                            100,
+                                            remainingTime = formattedTime,
+                                            remainingTimeMinutes = remainingTimeMinutes,
+                                            delayMinutes =
+                                                    response.statusLavatrice.delayValue.toInt()
+                                    )
+                            )
+                        } catch (e: Throwable) {
+                            Result.Error(ErrorReason.Unknown(e))
+                        }
                     }
+                    is Result.Error -> Result.Error(result.reason)
                 }
-
-                is Result.Error -> Result.Error(result.reason)
             }
-        }
+
+    suspend fun callTestCycleIn30Min(): Result<Unit> =
+            withContext(Dispatchers.Default) {
+                val requestArray =
+                        WashProgramRequest(
+                                        write = 1,
+                                        startStop = 1,
+                                        programNumber = 3,
+                                        programCode = 2,
+                                        delayValue = 1,
+                                        targetTemperature = 30,
+                                        targetSpinSpeed = 8,
+                                )
+                                .toQueryString()
+                                .toByteArray()
+
+                Timber.d("Test cycle request: ${requestArray.decodeToString()}")
+                val encrypted = encrypt(xorKey, requestArray)
+                val stringMessage = bytesToHex(encrypted)
+                Timber.d("Test cycle command (encrypted): $stringMessage")
+
+                when (val result = writeData(stringMessage)) {
+                    is Result.Success -> {
+                        try {
+                            val encryptedBytes = hexToBytes(result.data)
+                            val decrypted = decrypt(xorKey, encryptedBytes)
+                            Timber.d(
+                                    "Test cycle command response (decrypted): ${decrypted.decodeToString()}"
+                            )
+                            Result.Success(Unit)
+                        } catch (e: Throwable) {
+                            Result.Error(ErrorReason.Unknown(e))
+                        }
+                    }
+                    is Result.Error -> Result.Error(result.reason)
+                }
+            }
+
+    suspend fun callResetWashCycle(): Result<Unit> =
+            withContext(Dispatchers.Default) {
+                val requestArray =
+                        WashProgramRequest(
+                                        write = 1,
+                                        startStop = 0,
+                                        programNumber = 3,
+                                        delayValue = 0
+                                )
+                                .toQueryString()
+                                .toByteArray()
+
+                Timber.d("Reset command (plain): ${requestArray.decodeToString()}")
+
+                val encrypted = encrypt(xorKey, requestArray)
+                val stringMessage = bytesToHex(encrypted)
+                Timber.d("Reset command (encrypted): $stringMessage")
+
+                when (val result = writeData(stringMessage)) {
+                    is Result.Success -> {
+                        try {
+                            val encryptedBytes = hexToBytes(result.data)
+                            val decrypted = decrypt(xorKey, encryptedBytes)
+                            Timber.d(
+                                    "Reset command response (decrypted): ${decrypted.decodeToString()}"
+                            )
+                            Result.Success(Unit)
+                        } catch (e: Throwable) {
+                            Result.Error(ErrorReason.Unknown(e))
+                        }
+                    }
+                    is Result.Error -> Result.Error(result.reason)
+                }
+            }
+
+    suspend fun getUsageStats(): Result<StatusCounters> =
+            withContext(Dispatchers.Default) {
+                val requestArray = WashProgramRequest(getStats = 1).toQueryString().toByteArray()
+
+                Timber.d("Usage stats request: ${requestArray.decodeToString()}")
+                val encrypted = encrypt(xorKey, requestArray)
+                val stringMessage = bytesToHex(encrypted)
+                Timber.d("Usage stats command (encrypted): $stringMessage")
+
+                when (val result = writeData(stringMessage)) {
+                    is Result.Success -> {
+                        try {
+                            val encryptedBytes = hexToBytes(result.data)
+                            val decrypted = decrypt(xorKey, encryptedBytes)
+                            val jsonString = decrypted.decodeToString()
+                            Timber.d("Usage stats command response (decrypted): $jsonString")
+
+                            val usageStatsResponse =
+                                    json.decodeFromString<MachineUsageStatsResponse>(jsonString)
+
+                            Result.Success(usageStatsResponse.statusCounters)
+                        } catch (e: Throwable) {
+                            Result.Error(ErrorReason.Unknown(e))
+                        }
+                    }
+                    is Result.Error -> Result.Error(result.reason)
+                }
+            }
 
     private fun Throwable.toErrorReason(): ErrorReason {
         return when (this) {
-            is ConnectException,
-            is SocketTimeoutException,
-            is IOException -> ErrorReason.NetworkError(this.localizedMessage ?: "Network error")
+            is IOException, is ConnectException, is SocketTimeoutException ->
+                    ErrorReason.NetworkError(this.localizedMessage ?: "Network error")
             else -> ErrorReason.Unknown(this)
         }
     }

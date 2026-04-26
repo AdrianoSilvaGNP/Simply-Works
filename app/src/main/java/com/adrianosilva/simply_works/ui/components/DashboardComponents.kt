@@ -1,8 +1,12 @@
 package com.adrianosilva.simply_works.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,12 +23,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,21 +42,19 @@ import com.adrianosilva.simply_works.ui.theme.SoftWhite
 
 @Composable
 fun StatusCircularIndicator(
-    progress: Float, // 0 to 1
+    progress: Float, // 0.0 to 1.0
     mainText: String,
     subText: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
 ) {
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
+        targetValue = if (isLoading) 1f else progress,
         animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
         label = "progress"
     )
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.size(260.dp)
-    ) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier.size(260.dp)) {
         // Background Circle (faint)
         CircularProgressIndicator(
             progress = { 1f },
@@ -65,46 +68,77 @@ fun StatusCircularIndicator(
         CircularProgressIndicator(
             progress = { animatedProgress },
             modifier = Modifier.fillMaxSize(),
-            color = CyanAccent,
+            color = if (isLoading) CyanAccent.copy(alpha = 0.5f) else CyanAccent,
             strokeWidth = 12.dp,
             strokeCap = StrokeCap.Round,
             trackColor = Color.Transparent,
         )
 
+        // Content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = mainText,
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 48.sp,
-                    color = SoftWhite,
-                    shadow = Shadow(
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = CyanAccent,
+                    strokeWidth = 4.dp,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "UPDATING",
+                    style = MaterialTheme.typography.labelLarge.copy(
                         color = CyanAccent,
-                        blurRadius = 20f
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 )
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subText,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = SoftWhite.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Light
-                )
-            )
+            } else {
+                AnimatedContent(
+                    targetState = mainText,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "mainText"
+                ) { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 48.sp,
+                            color = SoftWhite,
+                            shadow =
+                            androidx.compose.ui.graphics.Shadow(
+                                color = CyanAccent,
+                                blurRadius = 20f
+                            )
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                AnimatedContent(
+                    targetState = subText,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "subText"
+                ) { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = SoftWhite.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Light
+                        )
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun StatCard(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
+fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier
             .width(100.dp)
@@ -141,8 +175,12 @@ fun GlassButton(
     modifier: Modifier = Modifier,
     icon: @Composable (() -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
         modifier = modifier,
         shape = RoundedCornerShape(50), // Pill shape
         color = GlassSurface.copy(alpha = 0.2f),
@@ -166,26 +204,6 @@ fun GlassButton(
     }
 }
 
-@Composable
-fun TextPill(
-    modifier: Modifier = Modifier,
-    text: String
-) {
-    Surface(
-        modifier = modifier,
-        color = GlassSurface,
-        shape = RoundedCornerShape(50),
-        border = BorderStroke(1.dp, GlassBorder)
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = CyanAccent
-        )
-    }
-}
-
 @Preview
 @Composable
 private fun StatusCircularIndicatorPreview() {
@@ -206,10 +224,4 @@ private fun StatCardPreview() {
 @Composable
 private fun GlassButtonPreview() {
     GlassButton(text = "Start Wash", onClick = {})
-}
-
-@Preview
-@Composable
-private fun TextPillPreview() {
-    TextPill(text = "Running")
 }

@@ -11,7 +11,7 @@ import com.adrianosilva.simply_works.domain.Result
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-class UsageStatsViewModel(private val api: CandyApiService): ViewModel() {
+class UsageStatsViewModel(private val api: CandyApiService) : ViewModel() {
 
     var state by mutableStateOf(UsageStatsUiState())
         private set
@@ -42,7 +42,6 @@ class UsageStatsViewModel(private val api: CandyApiService): ViewModel() {
                     }
                     state = state.copy(stats = stats)
                 }
-
                 is Result.Error -> {
                     Timber.e("Error fetching usage stats: ${result.reason}")
                 }
@@ -51,9 +50,9 @@ class UsageStatsViewModel(private val api: CandyApiService): ViewModel() {
     }
 
     companion object {
-        class UsageStatsViewModelFactory(private val apiService: CandyApiService):
-            ViewModelProvider.Factory {
-            override fun <T: ViewModel> create(modelClass: Class<T>): T {
+        class UsageStatsViewModelFactory(private val apiService: CandyApiService) :
+                ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 if (modelClass.isAssignableFrom(UsageStatsViewModel::class.java)) {
                     @Suppress("UNCHECKED_CAST") return UsageStatsViewModel(apiService) as T
                 }

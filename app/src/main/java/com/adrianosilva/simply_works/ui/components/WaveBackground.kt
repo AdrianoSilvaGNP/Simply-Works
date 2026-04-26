@@ -27,24 +27,26 @@ fun WaveBackground(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Box(
-        modifier = modifier.fillMaxSize()
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         val infiniteTransition = rememberInfiniteTransition(label = "wave")
 
-        val phase by infiniteTransition.animateFloat(
+        // Animate wave phase
+        val phase by
+        infiniteTransition.animateFloat(
             initialValue = 0f,
             targetValue = 2f * PI.toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(10000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(10000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
             label = "phase"
         )
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(color = PrimaryNavy)
+            drawRect(color = PrimaryNavy) // Solid background base
 
+            // Draw subtle waves
             drawWave(
                 amplitude = size.height * 0.03f,
                 period = size.width * 1.5f,
@@ -74,9 +76,9 @@ private fun DrawScope.drawWave(
     yOffset: Float
 ) {
     val path = Path()
-    val fullHeight = size.height
+    val halfHeight = size.height
 
-    path.moveTo(0f, fullHeight)
+    path.moveTo(0f, halfHeight)
 
     for (x in 0..size.width.toInt() step 10) {
         val xFloat = x.toFloat()
@@ -88,8 +90,8 @@ private fun DrawScope.drawWave(
         }
     }
 
-    path.lineTo(size.width, fullHeight)
-    path.lineTo(0f, fullHeight)
+    path.lineTo(size.width, size.height)
+    path.lineTo(0f, size.height)
     path.close()
 
     drawPath(path = path, color = color)
@@ -99,6 +101,8 @@ private fun DrawScope.drawWave(
 @Composable
 fun WaveBackgroundPreview() {
     SimplyworksTheme {
-        WaveBackground {}
+        WaveBackground {
+            // Empty content for preview
+        }
     }
 }

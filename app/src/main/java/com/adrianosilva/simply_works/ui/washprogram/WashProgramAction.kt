@@ -8,8 +8,6 @@ sealed class WashProgramAction {
     data class SelectSpinSpeed(val spinSpeed: Int): WashProgramAction()
     data class SetDelayValue(val delayValue: Int): WashProgramAction()
     data object SendWashProgram: WashProgramAction()
-}
-
-sealed class WashProgramEvent {
-    data object NavigateBack: WashProgramEvent()
+    data class SelectPreset(val preset: com.adrianosilva.simply_works.domain.models.WashPreset) : WashProgramAction()
+    data class SavePreset(val name: String) : WashProgramAction()
 }

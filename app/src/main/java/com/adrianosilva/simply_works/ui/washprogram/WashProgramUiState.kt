@@ -11,5 +11,6 @@ data class WashProgramUiState(
     val selectedSpinSpeed: Int = 8,
     val delayValue: Int = 0, // each value represents 30 minutes
     val isSendingRequest: Boolean = false,
-    val errorMessage: String? = null
-)
+    val isProcessing: Boolean = false,
+    val errorMessage: String? = null,
+    val savedPresets: List<com.adrianosilva.simply_works.domain.models.WashPreset> = emptyList())

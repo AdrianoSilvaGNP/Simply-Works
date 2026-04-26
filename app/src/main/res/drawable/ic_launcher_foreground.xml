@@ -1,15 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="960"
-    android:viewportHeight="960"
-    android:tint="#000000">
-  <group android:scaleX="0.58"
-      android:scaleY="0.58"
-      android:translateX="201.6"
-      android:translateY="201.6">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Ring -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M200,440L200,760Q200,760 200,760Q200,760 200,760L760,760Q760,760 760,760Q760,760 760,760L760,440L200,440ZM200,360L760,360L760,200Q760,200 760,200Q760,200 760,200L200,200Q200,200 200,200Q200,200 200,200L200,360ZM480,720Q447,720 423.5,696.5Q400,673 400,640Q400,613 415,582.5Q430,552 480,480Q530,552 545,582.5Q560,613 560,640Q560,673 536.5,696.5Q513,720 480,720ZM680,320Q697,320 708.5,308.5Q720,297 720,280Q720,263 708.5,251.5Q697,240 680,240Q663,240 651.5,251.5Q640,263 640,280Q640,297 651.5,308.5Q663,320 680,320ZM200,840Q167,840 143.5,816.5Q120,793 120,760L120,200Q120,167 143.5,143.5Q167,120 200,120L760,120Q793,120 816.5,143.5Q840,167 840,200L840,760Q840,793 816.5,816.5Q793,840 760,840L200,840ZM200,360L200,200Q200,200 200,200Q200,200 200,200L200,200Q200,200 200,200Q200,200 200,200L200,360Z"/>
-  </group>
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="4"
+        android:pathData="M54,20 A34,34 0 1 1 53.99,20" />
+
+    <!-- Inner Wave Symbol -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M34,54c0,0 5,-10 10,-10s10,10 10,10s5,10 10,10s10,-10 10,-10"
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"/>
+
+    <!-- Dot in center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,40 A2,2 0 1 1 51.99,40" />
 </vector>

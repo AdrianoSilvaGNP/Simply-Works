@@ -4,4 +4,6 @@ sealed class Screen(val route: String) {
     data object MachineStatus : Screen("machine_status")
     data object WashProgram : Screen("wash_program")
     data object UsageStats : Screen("usage_stats")
+    data object Setup : Screen("setup")
+    data object Settings : Screen("settings")
 }

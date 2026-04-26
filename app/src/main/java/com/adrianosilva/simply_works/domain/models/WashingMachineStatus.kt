@@ -10,5 +10,6 @@ data class WashingMachineStatus(
     val temp: Int,
     val spinSpeed: Int,
     val remainingTime: String,
+    val remainingTimeMinutes: Int,
     val delayMinutes: Int? = null
 )

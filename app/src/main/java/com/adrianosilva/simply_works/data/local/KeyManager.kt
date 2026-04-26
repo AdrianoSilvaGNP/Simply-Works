@@ -1,10 +1,11 @@
+
 package com.adrianosilva.simply_works.data.local
 
 import android.content.Context
-import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.adrianosilva.simply_works.Utils
+import androidx.core.content.edit
 
 class KeyManager(context: Context) {
 
@@ -34,7 +35,31 @@ class KeyManager(context: Context) {
         }
     }
 
+    fun saveIp(ip: String) {
+        sharedPreferences.edit { putString(KEY_IP, ip) }
+    }
+
+    fun getIp(): String? {
+        return sharedPreferences.getString(KEY_IP, null)
+    }
+
+    fun savePresets(presets: List<com.adrianosilva.simply_works.domain.models.WashPreset>) {
+        val json = kotlinx.serialization.json.Json.encodeToString(presets)
+        sharedPreferences.edit { putString(KEY_PRESETS, json) }
+    }
+
+    fun getPresets(): List<com.adrianosilva.simply_works.domain.models.WashPreset> {
+        val json = sharedPreferences.getString(KEY_PRESETS, null) ?: return emptyList()
+        return try {
+            kotlinx.serialization.json.Json.decodeFromString(json)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     companion object {
         private const val KEY_XOR = "KEY_XOR"
+        private const val KEY_IP = "KEY_IP"
+        private const val KEY_PRESETS = "KEY_PRESETS"
     }
 }
